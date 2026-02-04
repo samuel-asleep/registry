@@ -1,0 +1,88 @@
+# RDP Keep-Alive Monitor
+# Monitors active RDP connections and extends workspace session timeout
+
+$checkInterval = ${keepalive_interval}
+
+# Function to check for active RDP connections on port 3389
+function Test-RdpConnection {
+    try {
+        # Check for ESTABLISHED connections on RDP port 3389
+        $rdpConnections = Get-NetTCPConnection -LocalPort 3389 -State Established -ErrorAction SilentlyContinue
+        return ($null -ne $rdpConnections -and $rdpConnections.Count -gt 0)
+    }
+    catch {
+        return $false
+    }
+}
+
+# Function to extend workspace deadline via Coder API
+function Invoke-WorkspaceExtend {
+    param (
+        [string]$workspaceId,
+        [string]$coderUrl,
+        [string]$sessionToken
+    )
+    
+    try {
+        $apiUrl = "$coderUrl/api/v2/workspaces/$workspaceId/extend"
+        $headers = @{
+            "Coder-Session-Token" = $sessionToken
+            "Content-Type" = "application/json"
+        }
+        
+        # Extend deadline by default duration (server will use workspace auto-stop setting)
+        $body = @{
+            deadline = (Get-Date).AddHours(8).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        } | ConvertTo-Json
+        
+        $response = Invoke-RestMethod -Uri $apiUrl -Method PUT -Headers $headers -Body $body -TimeoutSec 10 -ErrorAction Stop
+        return $true
+    }
+    catch {
+        Write-Host "Warning: Failed to extend workspace deadline: $_" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+# Main monitoring loop
+Write-Host "RDP Keep-Alive Monitor started (check interval: $checkInterval seconds)"
+
+# Get required environment variables
+$coderUrl = $env:CODER_URL
+$sessionToken = $env:CODER_SESSION_TOKEN
+$workspaceId = $env:CODER_WORKSPACE_ID
+
+if ([string]::IsNullOrEmpty($coderUrl) -or [string]::IsNullOrEmpty($sessionToken) -or [string]::IsNullOrEmpty($workspaceId)) {
+    Write-Host "Error: Required Coder environment variables not found. Keep-alive monitoring disabled." -ForegroundColor Red
+    Write-Host "CODER_URL: $coderUrl" -ForegroundColor Gray
+    Write-Host "CODER_SESSION_TOKEN: $(if ($sessionToken) { '[set]' } else { '[not set]' })" -ForegroundColor Gray
+    Write-Host "CODER_WORKSPACE_ID: $workspaceId" -ForegroundColor Gray
+    exit 0
+}
+
+$lastExtendTime = [DateTime]::MinValue
+$minimumExtendInterval = 300 # Minimum 5 minutes between extends to avoid spamming the API
+
+while ($true) {
+    try {
+        $hasActiveRdp = Test-RdpConnection
+        
+        if ($hasActiveRdp) {
+            $timeSinceLastExtend = (Get-Date) - $lastExtendTime
+            
+            if ($timeSinceLastExtend.TotalSeconds -ge $minimumExtendInterval) {
+                Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Active RDP connection detected - extending workspace session"
+                
+                if (Invoke-WorkspaceExtend -workspaceId $workspaceId -coderUrl $coderUrl -sessionToken $sessionToken) {
+                    $lastExtendTime = Get-Date
+                    Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] Workspace session extended successfully"
+                }
+            }
+        }
+    }
+    catch {
+        Write-Host "Error in keep-alive loop: $_" -ForegroundColor Red
+    }
+    
+    Start-Sleep -Seconds $checkInterval
+}

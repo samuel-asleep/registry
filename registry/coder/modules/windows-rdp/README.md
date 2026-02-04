@@ -10,6 +10,8 @@ tags: [windows, rdp, web, desktop]
 
 Enable Remote Desktop + a web based client on Windows workspaces, powered by [devolutions-gateway](https://github.com/Devolutions/devolutions-gateway).
 
+**Automatic Keep-Alive**: By default, this module automatically extends your workspace session timeout while an RDP connection is active, preventing unexpected shutdowns during remote desktop sessions.
+
 ```tf
 # AWS example. See below for examples of using this module with other providers
 module "windows_rdp" {
@@ -57,5 +59,30 @@ module "windows_rdp" {
   version                     = "1.3.0"
   agent_id                    = coder_agent.main.id
   devolutions_gateway_version = "2025.2.2" # Specify a specific version
+}
+```
+
+### With Custom Keep-Alive Settings
+
+```tf
+module "windows_rdp" {
+  count              = data.coder_workspace.me.start_count
+  source             = "registry.coder.com/coder/windows-rdp/coder"
+  version            = "1.3.0"
+  agent_id           = coder_agent.main.id
+  keepalive          = true # Default: true - automatically extend session during RDP use
+  keepalive_interval = 120  # Default: 60 - check for RDP connections every 120 seconds
+}
+```
+
+### Disable Keep-Alive
+
+```tf
+module "windows_rdp" {
+  count     = data.coder_workspace.me.start_count
+  source    = "registry.coder.com/coder/windows-rdp/coder"
+  version   = "1.3.0"
+  agent_id  = coder_agent.main.id
+  keepalive = false # Disable automatic session extension
 }
 ```

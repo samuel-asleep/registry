@@ -11,6 +11,8 @@ type TestVariables = Readonly<{
   share?: string;
   admin_username?: string;
   admin_password?: string;
+  keepalive?: boolean;
+  keepalive_interval?: number;
 }>;
 
 function findWindowsRdpScript(state: TerraformState): string | null {
@@ -27,6 +29,25 @@ function findWindowsRdpScript(state: TerraformState): string | null {
         instance.attributes.display_name === "windows-rdp" &&
         typeof instance.attributes.script === "string"
       ) {
+        return instance.attributes.script;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findKeepaliveScript(state: TerraformState): string | null {
+  for (const resource of state.resources) {
+    const isKeepaliveScriptResource =
+      resource.type === "coder_script" && resource.name === "rdp-keepalive";
+
+    if (!isKeepaliveScriptResource) {
+      continue;
+    }
+
+    for (const instance of resource.instances) {
+      if (typeof instance.attributes.script === "string") {
         return instance.attributes.script;
       }
     }
@@ -127,5 +148,38 @@ describe("Web RDP", async () => {
 
     expect(customResultsGroup.username).toBe(customAdminUsername);
     expect(customResultsGroup.password).toBe(customAdminPassword);
+  });
+
+  it("Has keep-alive enabled by default", async () => {
+    const state = await runTerraformApply<TestVariables>(import.meta.dir, {
+      agent_id: "foo",
+    });
+
+    const keepaliveScript = findKeepaliveScript(state);
+    expect(keepaliveScript).toBeString();
+    expect(keepaliveScript).toContain("RDP Keep-Alive Monitor");
+    expect(keepaliveScript).toContain("$checkInterval = 60"); // Default interval
+  });
+
+  it("Can disable keep-alive", async () => {
+    const state = await runTerraformApply<TestVariables>(import.meta.dir, {
+      agent_id: "foo",
+      keepalive: false,
+    });
+
+    const keepaliveScript = findKeepaliveScript(state);
+    expect(keepaliveScript).toBeNull();
+  });
+
+  it("Can customize keep-alive interval", async () => {
+    const state = await runTerraformApply<TestVariables>(import.meta.dir, {
+      agent_id: "foo",
+      keepalive: true,
+      keepalive_interval: 120,
+    });
+
+    const keepaliveScript = findKeepaliveScript(state);
+    expect(keepaliveScript).toBeString();
+    expect(keepaliveScript).toContain("$checkInterval = 120");
   });
 });
