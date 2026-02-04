@@ -68,7 +68,7 @@ module "windows_rdp" {
 module "windows_rdp" {
   count              = data.coder_workspace.me.start_count
   source             = "registry.coder.com/coder/windows-rdp/coder"
-  version            = "1.3.0"
+  version            = "1.4.0"
   agent_id           = coder_agent.main.id
   keepalive          = true # Default: true - automatically extend session during RDP use
   keepalive_interval = 120  # Default: 60 - check for RDP connections every 120 seconds
@@ -81,7 +81,7 @@ module "windows_rdp" {
 module "windows_rdp" {
   count     = data.coder_workspace.me.start_count
   source    = "registry.coder.com/coder/windows-rdp/coder"
-  version   = "1.3.0"
+  version   = "1.4.0"
   agent_id  = coder_agent.main.id
   keepalive = false # Disable automatic session extension
 }
