@@ -70,8 +70,8 @@ module "windows_rdp" {
   source             = "registry.coder.com/coder/windows-rdp/coder"
   version            = "1.4.0"
   agent_id           = coder_agent.main.id
-  keepalive          = true  # Enable RDP connection monitoring
-  keepalive_interval = 300   # Check every 5 minutes (default)
+  keepalive          = true # Enable RDP connection monitoring
+  keepalive_interval = 300  # Check every 5 minutes (default)
 }
 ```
 
