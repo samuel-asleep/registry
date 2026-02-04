@@ -80,6 +80,10 @@ variable "keepalive_interval" {
   type        = number
   default     = 300
   description = "Interval in seconds between RDP connection checks when keepalive is enabled. Default is 300 seconds (5 minutes)."
+  validation {
+    condition     = var.keepalive_interval >= 60 && var.keepalive_interval <= 3600
+    error_message = "keepalive_interval must be between 60 and 3600 seconds."
+  }
 }
 
 resource "coder_script" "windows-rdp" {
